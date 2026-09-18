@@ -49,7 +49,7 @@
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
 #include "task.h"
-
+#include "drivers/gpio_driver.h"
 /* Standard includes. */
 #include <stdio.h>
 #include <string.h>
@@ -102,48 +102,83 @@ void vFullDemoIdleFunction( void );
 static void prvUARTInit( void );
 
 /*-----------------------------------------------------------*/
+static void prvGPIODriverTask( void * pvParameters );
 
-int main( void )
-{
     /* See https://www.freertos.org/freertos-on-qemu-mps2-an385-model.html for
      * instructions. */
-
-	/* Initializing TraceRecorder. Using #if (configUSE_TRACE_FACILITY == 1)
+int main( void )
+{
+    /* Initializing TraceRecorder. Using #if (configUSE_TRACE_FACILITY == 1)
 	 * is normally not needed. TraceRecorder API calls are normally ignored
      * and produce no code when configUSE_TRACE_FACILITY is 0, assuming 
 	 * trcRecorder.h is included. However, this was missing for 
 	 * xTraceTimestampSetPeriod() in TraceRecorder v4.10.2. */   
-#if (configUSE_TRACE_FACILITY == 1)
+    #if (configUSE_TRACE_FACILITY == 1)
 
-	/* TODO TraceRecorder (Step 2): Call xTraceInitialize early in main().
-	 * This should be called before any FreeRTOS calls are made. */
-	xTraceInitialize();
-	
-	/* TODO TraceRecorder (Step 3): Call xTraceEnable to start tracing. */
-	xTraceEnable(TRC_START);
-	
-	/* Extra step needed for using TraceRecorder on QEMU. */
-	xTraceTimestampSetPeriod(configCPU_CLOCK_HZ/configTICK_RATE_HZ);
+        /* TODO TraceRecorder (Step 2): Call xTraceInitialize early in main().
+        * This should be called before any FreeRTOS calls are made. */
+        xTraceInitialize();
+        
+        /* TODO TraceRecorder (Step 3): Call xTraceEnable to start tracing. */
+        xTraceEnable(TRC_START);
+        
+        /* Extra step needed for using TraceRecorder on QEMU. */
+        xTraceTimestampSetPeriod(configCPU_CLOCK_HZ/configTICK_RATE_HZ);
 
-#endif	
+    #endif	
 
     /* Hardware initialisation.  printf() output uses the UART for IO. */
     prvUARTInit();
 
-    /* The mainCREATE_SIMPLE_BLINKY_DEMO_ONLY setting is described at the top
-     * of this file. */
-    #if ( mainCREATE_SIMPLE_BLINKY_DEMO_ONLY == 1 )
-    {
-        main_blinky();
-    }
-    #else
-    {
-        main_full();
-    }
-    #endif
+    xTaskCreate( prvGPIODriverTask,
+                     "Drv",
+                     configMINIMAL_STACK_SIZE * 4,
+                     NULL,
+                     tskIDLE_PRIORITY + 1,
+                     NULL );
+
+    vTaskStartScheduler();
+
     return 0;
 }
 /*-----------------------------------------------------------*/
+
+static void prvGPIODriverTask( void * pvParameters )
+{
+    ( void ) pvParameters;
+
+    gpio_config_t xConfig;
+    xConfig.ucPin = 0;
+    int i;
+    gpio_status_t xStatus;
+
+    xStatus = gpio_driver_init( &xConfig );
+    if( xStatus != GPIO_OK )
+    {
+        printf( "gpio init failed, status %d\r\n", ( int ) xStatus );
+        vTaskDelete( NULL );
+    }
+
+    for( i = 0; i < 4; i++ )
+    {
+        xStatus = gpio_driver_write( 1, pdMS_TO_TICKS( 100 ) );
+        if( xStatus != GPIO_OK )
+        {
+            printf( "gpio write failed, status %d\r\n", ( int ) xStatus );
+        }
+        vTaskDelay( pdMS_TO_TICKS( 3000 ) );
+
+        xStatus = gpio_driver_write( 0, pdMS_TO_TICKS( 100 ) );
+        if( xStatus != GPIO_OK )
+        {
+            printf( "gpio write failed, status %d\r\n", ( int ) xStatus );
+        }
+        vTaskDelay( pdMS_TO_TICKS( 3000 ) );
+    }
+
+    gpio_driver_deinit();
+    vTaskDelete( NULL );
+}
 
 void vApplicationMallocFailedHook( void )
 {
