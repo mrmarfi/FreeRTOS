@@ -134,6 +134,11 @@ SOURCE_FILES +=	(TRACERECORDER_DIR)/trcString.c
 SOURCE_FILES +=	(TRACERECORDER_DIR)/trcTask.c
 SOURCE_FILES +=	(TRACERECORDER_DIR)/trcTimestamp.c
 
+DRIVERS_DIR = $(DEMO_PROJECT)/Source/drivers
+INCLUDE_DIRS += -I$(DEMO_PROJECT)/Source
+VPATH += $(DRIVERS_DIR)
+SOURCE_FILES += $(DRIVERS_DIR)/uart_driver.c
+
 #Create a list of object files with the desired output directory path.
 OBJS = $(SOURCE_FILES:%.c=%.o)
 OBJS_NO_PATH = $(notdir $(OBJS))

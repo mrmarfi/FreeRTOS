@@ -50,6 +50,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include "drivers/uart_driver.h"
+
 /* Standard includes. */
 #include <stdio.h>
 #include <string.h>
@@ -102,6 +104,7 @@ void vFullDemoIdleFunction( void );
 static void prvUARTInit( void );
 
 /*-----------------------------------------------------------*/
+static void prvUARTDriverTask( void * pvParameters );
 
 int main( void )
 {
@@ -130,19 +133,51 @@ int main( void )
     /* Hardware initialisation.  printf() output uses the UART for IO. */
     prvUARTInit();
 
-    /* The mainCREATE_SIMPLE_BLINKY_DEMO_ONLY setting is described at the top
-     * of this file. */
-    #if ( mainCREATE_SIMPLE_BLINKY_DEMO_ONLY == 1 )
-    {
-        main_blinky();
-    }
-    #else
-    {
-        main_full();
-    }
-    #endif
+    xTaskCreate( prvUARTDriverTask,
+                     "Drv",
+                     configMINIMAL_STACK_SIZE * 4,
+                     NULL,
+                     tskIDLE_PRIORITY + 1,
+                     NULL );
+
+    vTaskStartScheduler();
     return 0;
 }
+
+static void prvUARTDriverTask( void * pvParameters )
+{
+    ( void ) pvParameters;
+
+    uart_config_t xConfig;
+    xConfig.ulBaudDiv = 0;   /* reserved, unused: see uart_driver_init() */
+    uart_status_t xStatus;
+    uint8_t ucByte;
+
+    xStatus = uart_driver_init( &xConfig );
+    if( xStatus != UART_OK )
+    {
+        printf( "uart init failed, status %d\r\n", ( int ) xStatus );
+        vTaskDelete( NULL );
+    }
+
+    printf( "uart driver ready, type a character to see it echoed\r\n" );
+
+    for( ; ; )
+    {
+        xStatus = uart_driver_read( &ucByte, portMAX_DELAY );
+        if( xStatus == UART_OK )
+        {
+            printf( "byte received: '%c'\r\n", ucByte );
+            uart_driver_write( ucByte, pdMS_TO_TICKS( 100 ) );
+            printf( "\nbyte echoed back: '%c'\r\n", ucByte );
+        }
+        else
+        {
+            printf( "uart read failed, status %d\r\n", ( int ) xStatus );
+        }
+    }
+}
+
 /*-----------------------------------------------------------*/
 
 void vApplicationMallocFailedHook( void )
