@@ -14,12 +14,13 @@ typedef enum
 
 typedef struct
 {
-    uint32_t ulBaudDiv;   /* Value for BAUDDIV; caller supplies a valid divider. */
+    /* Value for BAUDDIV, reserved for an instance that does not share UART0 with the console */
+    uint32_t ulBaudDivisor;  
 } uart_config_t;
 
-uart_status_t uart_driver_init( const uart_config_t * pxConfig );
-uart_status_t uart_driver_write( uint8_t ucByte, TickType_t xTimeout );
-uart_status_t uart_driver_read( uint8_t * pucByte, TickType_t xTimeout );
-uart_status_t uart_driver_deinit( void );
+uart_status_t eUARTDriverInit( const uart_config_t * pxConfig );
+uart_status_t eUARTDriverWrite( uint8_t ucByte, TickType_t xTimeout );
+uart_status_t eUARTDriverRead( uint8_t * pucByte, TickType_t xTimeout );
+uart_status_t eUARTDriverDeinit( void );
 
 #endif

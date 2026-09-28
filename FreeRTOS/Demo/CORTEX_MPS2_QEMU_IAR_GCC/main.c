@@ -108,55 +108,44 @@ static void prvUARTDriverTask( void * pvParameters );
 
 int main( void )
 {
-    /* See https://www.freertos.org/freertos-on-qemu-mps2-an385-model.html for
-     * instructions. */
-
-	/* Initializing TraceRecorder. Using #if (configUSE_TRACE_FACILITY == 1)
-	 * is normally not needed. TraceRecorder API calls are normally ignored
-     * and produce no code when configUSE_TRACE_FACILITY is 0, assuming 
-	 * trcRecorder.h is included. However, this was missing for 
-	 * xTraceTimestampSetPeriod() in TraceRecorder v4.10.2. */   
-#if (configUSE_TRACE_FACILITY == 1)
-
-	/* TODO TraceRecorder (Step 2): Call xTraceInitialize early in main().
-	 * This should be called before any FreeRTOS calls are made. */
-	xTraceInitialize();
-	
-	/* TODO TraceRecorder (Step 3): Call xTraceEnable to start tracing. */
-	xTraceEnable(TRC_START);
-	
-	/* Extra step needed for using TraceRecorder on QEMU. */
-	xTraceTimestampSetPeriod(configCPU_CLOCK_HZ/configTICK_RATE_HZ);
-
-#endif	
+    /* See https://www.freertos.org/freertos-on-qemu-mps2-an385-model.html for instructions. */
+    
+    #if ( configUSE_TRACE_FACILITY == 1 )
+        xTraceInitialize();
+        xTraceEnable( TRC_START );
+        xTraceTimestampSetPeriod( configCPU_CLOCK_HZ / configTICK_RATE_HZ );
+    #endif
 
     /* Hardware initialisation.  printf() output uses the UART for IO. */
     prvUARTInit();
-
-    xTaskCreate( prvUARTDriverTask,
-                     "Drv",
-                     configMINIMAL_STACK_SIZE * 4,
-                     NULL,
-                     tskIDLE_PRIORITY + 1,
-                     NULL );
-
+    /* Creates the driver's task */ 
+    xTaskCreate( prvUARTDriverTask, 			/* task function */
+                 "Task", 				/* task name */
+                 configMINIMAL_STACK_SIZE * 4, /* stack size */
+                 NULL,				/* task parameter */
+                 tskIDLE_PRIORITY + 1,	/* priority */
+                 NULL );				/* task handle */
+   
+    /* hands control to the scheduler */
     vTaskStartScheduler();
     return 0;
 }
 
+
 static void prvUARTDriverTask( void * pvParameters )
 {
-    ( void ) pvParameters;
 
     uart_config_t xConfig;
-    xConfig.ulBaudDiv = 0;   /* reserved, unused: see uart_driver_init() */
-    uart_status_t xStatus;
+    xConfig.ulBaudDivisor = 0;
+    uart_status_t eStatus;
     uint8_t ucByte;
 
-    xStatus = uart_driver_init( &xConfig );
-    if( xStatus != UART_OK )
+    ( void ) pvParameters;
+
+    eStatus = eUARTDriverInit( &xConfig );
+    if( eStatus!= UART_OK )
     {
-        printf( "uart init failed, status %d\r\n", ( int ) xStatus );
+        printf( "uart init failed, status %d\r\n", ( int ) eStatus);
         vTaskDelete( NULL );
     }
 
@@ -164,19 +153,20 @@ static void prvUARTDriverTask( void * pvParameters )
 
     for( ; ; )
     {
-        xStatus = uart_driver_read( &ucByte, portMAX_DELAY );
-        if( xStatus == UART_OK )
+        eStatus = eUARTDriverRead( &ucByte, portMAX_DELAY );
+        if( eStatus == UART_OK )
         {
             printf( "byte received: '%c'\r\n", ucByte );
-            uart_driver_write( ucByte, pdMS_TO_TICKS( 100 ) );
+            eUARTDriverWrite( ucByte, pdMS_TO_TICKS( 100 ) );
             printf( "\nbyte echoed back: '%c'\r\n", ucByte );
         }
         else
         {
-            printf( "uart read failed, status %d\r\n", ( int ) xStatus );
+            printf( "uart read failed, status %d\r\n", ( int ) eStatus );
         }
     }
 }
+
 
 /*-----------------------------------------------------------*/
 
