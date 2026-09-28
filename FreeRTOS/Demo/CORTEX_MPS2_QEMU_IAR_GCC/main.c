@@ -104,79 +104,66 @@ static void prvUARTInit( void );
 /*-----------------------------------------------------------*/
 static void prvGPIODriverTask( void * pvParameters );
 
-    /* See https://www.freertos.org/freertos-on-qemu-mps2-an385-model.html for
-     * instructions. */
 int main( void )
 {
-    /* Initializing TraceRecorder. Using #if (configUSE_TRACE_FACILITY == 1)
-	 * is normally not needed. TraceRecorder API calls are normally ignored
-     * and produce no code when configUSE_TRACE_FACILITY is 0, assuming 
-	 * trcRecorder.h is included. However, this was missing for 
-	 * xTraceTimestampSetPeriod() in TraceRecorder v4.10.2. */   
-    #if (configUSE_TRACE_FACILITY == 1)
-
-        /* TODO TraceRecorder (Step 2): Call xTraceInitialize early in main().
-        * This should be called before any FreeRTOS calls are made. */
+    /* See https://www.freertos.org/freertos-on-qemu-mps2-an385-model.html for instructions. */
+    #if ( configUSE_TRACE_FACILITY == 1 )
         xTraceInitialize();
-        
-        /* TODO TraceRecorder (Step 3): Call xTraceEnable to start tracing. */
-        xTraceEnable(TRC_START);
-        
-        /* Extra step needed for using TraceRecorder on QEMU. */
-        xTraceTimestampSetPeriod(configCPU_CLOCK_HZ/configTICK_RATE_HZ);
+        xTraceEnable( TRC_START );
+        xTraceTimestampSetPeriod( configCPU_CLOCK_HZ / configTICK_RATE_HZ );
+    #endif
 
-    #endif	
-
-    /* Hardware initialisation.  printf() output uses the UART for IO. */
+        /* Hardware initialisation.  printf() output uses the UART for IO. */
     prvUARTInit();
-
-    xTaskCreate( prvGPIODriverTask,
-                     "Drv",
-                     configMINIMAL_STACK_SIZE * 4,
-                     NULL,
-                     tskIDLE_PRIORITY + 1,
-                     NULL );
-
+    /* Creates the driver's task */ 
+    xTaskCreate( prvGPIODriverTask, 			/* task function */
+                 "Task", 				/* task name */
+                 configMINIMAL_STACK_SIZE * 4, /* stack size */
+                 NULL,				/* task parameter */
+                 tskIDLE_PRIORITY + 1,	/* priority */
+                 NULL );				/* task handle */
+   
+    /* hands control to the scheduler */
     vTaskStartScheduler();
-
     return 0;
 }
+
 /*-----------------------------------------------------------*/
 
 static void prvGPIODriverTask( void * pvParameters )
 {
-    ( void ) pvParameters;
-
     gpio_config_t xConfig;
-    xConfig.ucPin = 0;
-    int i;
-    gpio_status_t xStatus;
+    BaseType_t xIteration;
+    gpio_status_t eStatus;
 
-    xStatus = gpio_driver_init( &xConfig );
-    if( xStatus != GPIO_OK )
+    ( void ) pvParameters;
+    xConfig.ucPin = 0;
+
+    eStatus = eGPIODriverInit( &xConfig );
+    if( eStatus!= GPIO_OK )
     {
-        printf( "gpio init failed, status %d\r\n", ( int ) xStatus );
+        printf( "gpio init failed, status %d\r\n", ( int ) eStatus);
         vTaskDelete( NULL );
     }
 
-    for( i = 0; i < 4; i++ )
+    for( xIteration = 0; xIteration < 4; xIteration ++ )
     {
-        xStatus = gpio_driver_write( 1, pdMS_TO_TICKS( 100 ) );
-        if( xStatus != GPIO_OK )
+        eStatus = eGPIODriverWrite( 1, pdMS_TO_TICKS( 100 ) );
+        if( eStatus != GPIO_OK )
         {
-            printf( "gpio write failed, status %d\r\n", ( int ) xStatus );
+            printf( "gpio write failed, status %d\r\n", ( int ) eStatus);
         }
         vTaskDelay( pdMS_TO_TICKS( 3000 ) );
 
-        xStatus = gpio_driver_write( 0, pdMS_TO_TICKS( 100 ) );
-        if( xStatus != GPIO_OK )
+        eStatus = eGPIODriverWrite( 0, pdMS_TO_TICKS( 100 ) );
+        if( eStatus!= GPIO_OK )
         {
-            printf( "gpio write failed, status %d\r\n", ( int ) xStatus );
+            printf( "gpio write failed, status %d\r\n", ( int ) eStatus );
         }
         vTaskDelay( pdMS_TO_TICKS( 3000 ) );
     }
 
-    gpio_driver_deinit();
+    eGPIODriverDeinit();
     vTaskDelete( NULL );
 }
 
